@@ -1,31 +1,5 @@
 #!/usr/bin/env python3
-"""
-GitHub contribution graph writer via empty commits.
-
-What it does:
-- Renders a word into a 53x7 grid (weeks x weekdays) for a given year, or
-  lets you draw exact custom graph shapes in a small editor.
-- Maps lit cells to calendar dates for that year's contribution graph.
-- Creates empty commits on those dates and pushes to your remote.
-
-Defaults:
-- Draws across the last three full years:
-    [year-3+1, year-2+1, year-1] => words ["LEBRON","elephanto","feel"]
-  Example today (2025): years [2022, 2023, 2024]
-
-Safety notes:
-- It commits a lot. Use DRY_RUN first to preview counts.
-- Commits are chronological to keep history clean.
-
-Usage (inside your repo):
-  python main.py --dry-run
-  python main.py
-  # Optional custom mapping:
-  python main.py --map 2021:HELLO --map 2022:world --remote origin
-  # Draw exact shapes and copy the generated command:
-  python main.py --design
-
-"""
+"""GitHub contribution graph writer with a small shape designer."""
 
 import argparse
 import base64
@@ -35,20 +9,14 @@ import os
 import zlib
 from datetime import date, datetime, timedelta, timezone
 
-# ---------- small helpers ----------
-
 def sunday_on_or_before(d: date) -> date:
-    # Python weekday: Mon=0..Sun=6. We want the prior or same Sunday.
     return d - timedelta(days=(d.weekday() + 1) % 7)
 
 def all_dates_for_year_grid(year: int):
-    """
-    Returns a 53x7 matrix of actual calendar dates covering GitHub's year grid.
-    We start from the Sunday on or before Jan 1, then fill 53 weeks x 7 days.
-    """
+    """Return a 53x7 matrix of dates covering a GitHub-style year grid."""
     start = sunday_on_or_before(date(year, 1, 1))
     grid = [[start + timedelta(days=7*x + y) for y in range(7)] for x in range(53)]
-    return grid  # [x][y]
+    return grid
 
 WIDTH = 53
 HEIGHT = 7
@@ -69,8 +37,6 @@ def rasterize_text_to_53x7(text: str) -> list:
     except Exception as exc:
         raise SystemExit("Text mode needs Pillow. Install with: pip install pillow") from exc
 
-    # Draw large to preserve shapes, then downscale cleanly.
-    # The default PIL font is fine; we just need legible blobs.
     font = ImageFont.load_default()
     tmp = Image.new("L", (1200, 200), 0)
     drw = ImageDraw.Draw(tmp)
@@ -80,11 +46,8 @@ def rasterize_text_to_53x7(text: str) -> list:
         return empty_levels()
     cropped = tmp.crop(bbox)
 
-    # Resize to the contribution grid size: width 53, height 7
-    # Use NEAREST to keep pixels crisp.
     small = cropped.resize((53, 7), Image.NEAREST)
 
-    # Binarize: any value > 0 becomes True
     data = small.load()
     out = [[MAX_LEVEL if data[x, y] else 0 for x in range(WIDTH)] for y in range(HEIGHT)]
     return out
@@ -136,13 +99,7 @@ def shape_from_text(word: str):
 
 
 def compute_commit_schedule_from_levels(levels: list, year: int):
-    """
-    Combine the raster grid with the calendar grid.
-    Only keep dates that fall inside `year` to avoid bleeding into adjacent years.
-    Returns a chronologically sorted list of datetime values in UTC. A cell with
-    level N creates N commits on that date, so darker drawn cells become darker
-    contribution squares.
-    """
+    """Combine the raster grid with the calendar grid for one year."""
     cal = all_dates_for_year_grid(year)
 
     selected = []
@@ -154,7 +111,6 @@ def compute_commit_schedule_from_levels(levels: list, year: int):
             d = cal[x][y]
             if d.year != year:
                 continue
-            # Noon UTC avoids TZ edge cases
             ts = datetime(d.year, d.month, d.day, 12, 0, 0)
             selected.extend([ts] * min(level, MAX_LEVEL))
 
@@ -164,6 +120,30 @@ def compute_commit_schedule_from_levels(levels: list, year: int):
 
 def compute_commit_schedule(word: str, year: int):
     return compute_commit_schedule_from_levels(shape_from_text(word), year)
+
+def shell_quote(value: str) -> str:
+    return "'" + str(value).replace("'", "'\"'\"'") + "'"
+
+def format_stamp(ts: datetime) -> str:
+    return ts.strftime("%Y-%m-%d %H:%M:%S +0000")
+
+def build_git_command_from_shapes(shapes: dict, years: list) -> str:
+    lines = ["# Run this from the root of the git repository you want to update.", "set -e"]
+    for year in sorted(years):
+        per_day = {}
+        schedule = compute_commit_schedule_from_levels(shapes[year], year)
+        for ts in schedule:
+            stamp = format_stamp(ts)
+            day = ts.date().isoformat()
+            per_day[day] = per_day.get(day, 0) + 1
+            msg = f"[imprint] {year} {day} #{per_day[day]}"
+            lines.append(
+                f"GIT_AUTHOR_DATE={shell_quote(stamp)} GIT_COMMITTER_DATE={shell_quote(stamp)} "
+                f"git commit --allow-empty -m {shell_quote(msg)} --quiet"
+            )
+    if len(lines) == 2:
+        return "# Draw some cells first, then copy the git command."
+    return "\n".join(lines)
 
 
 def run(cmd, env=None):
@@ -351,15 +331,7 @@ def launch_designer():
         summary_text.configure(state="disabled")
 
     def refresh_command():
-        parts = []
-        for yr in sorted(shapes):
-            levels = shapes[yr]
-            if any(any(row) for row in levels):
-                parts.append(f"--shape {yr}:{encode_shape(levels)}")
-        if parts:
-            cmd = "python3 main.py \\\n  " + " \\\n  ".join(parts)
-        else:
-            cmd = "Draw cells to generate a command."
+        cmd = build_git_command_from_shapes(shapes, years)
         command_text.delete("1.0", "end")
         command_text.insert("1.0", cmd)
 
@@ -467,11 +439,8 @@ def launch_designer():
     refresh_command()
     root.mainloop()
 
-# ---------- main logic ----------
-
 def main():
     now = datetime.now(timezone.utc)
-    # Choose the last three full years by default
     last_full = now.year - 1
     default_map = [(last_full - 2, "LEBRON"),
                    (last_full - 1, "elephanto"),
@@ -495,7 +464,6 @@ def main():
         launch_designer()
         return
 
-    # Build mapping
     mappings = []
     custom_shapes = []
     if args.map:
@@ -517,14 +485,12 @@ def main():
     if not mappings and not custom_shapes:
         mappings = default_map
 
-    # Confirm we are inside a git repo
     try:
         run(["git", "rev-parse", "--is-inside-work-tree"])
     except SystemExit:
         sys.stderr.write("Not a git repository. Initialize one and add a remote before running.\n")
         return
 
-    # Determine target ref
     if args.branch:
         run(["git", "checkout", "-B", args.branch])
 
@@ -545,7 +511,6 @@ def main():
             env["GIT_AUTHOR_DATE"] = iso
             env["GIT_COMMITTER_DATE"] = iso
             msg = f"[contrib] {word} {year} {ts.date()}"
-            # --allow-empty avoids file changes. --quiet keeps output terse.
             run(["git", "commit", "--allow-empty", "-m", msg, "--quiet"], env=env)
 
     for year, levels in custom_shapes:
@@ -570,7 +535,6 @@ def main():
         print(f"[DRY-RUN] Total would commit: {total}")
         return
 
-    # Push to remote
     ref = "HEAD" if not args.branch else args.branch
     print(f"Pushing to '{args.remote}' {ref}")
     run(["git", "push", args.remote, ref])

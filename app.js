@@ -1,9 +1,12 @@
 const WIDTH = 53;
 const HEIGHT = 7;
 const MAX_LEVEL = 4;
+const MIN_YEAR = 1970;
+const MAX_YEAR = 9999;
 const STORAGE_KEY = "imprint-state-v1";
+const YEAR_DENSITY_THRESHOLD = 6;
 
-const colors = ["#ebedf0", "#9be9a8", "#40c463", "#30a14e", "#216e39"];
+const cellColors = ["#e5e7eb", "#9fd89d", "#55c56c", "#2ea043", "#1f7a3d"];
 const weekdayLabels = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 const els = {
@@ -17,13 +20,73 @@ const els = {
   clearYear: document.getElementById("clear-year"),
   prevYear: document.getElementById("prev-year"),
   nextYear: document.getElementById("next-year"),
-  currentYear: document.getElementById("current-year"),
+  currentYearTrigger: document.getElementById("current-year-trigger"),
+  currentYearLabel: document.getElementById("current-year-label"),
+  currentYearMenu: document.getElementById("current-year-menu"),
+  yearSelect: document.getElementById("year-select"),
   brushGroup: document.getElementById("brush-group"),
   summary: document.getElementById("summary"),
   command: document.getElementById("command"),
   copyCommand: document.getElementById("copy-command"),
   canvas: document.getElementById("graph-canvas"),
+  toolbar: document.querySelector(".toolbar"),
 };
+
+const ICONS = {
+  plus: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 5v14M5 12h14" />
+    </svg>
+  `,
+  trash: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M3 6h18M8 6V4.5A1.5 1.5 0 0 1 9.5 3h5A1.5 1.5 0 0 1 16 4.5V6m-8 0v13a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V6M10 10v6M14 10v6" />
+    </svg>
+  `,
+  chevronLeft: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M15 18 9 12l6-6" />
+    </svg>
+  `,
+  chevronRight: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="m9 18 6-6-6-6" />
+    </svg>
+  `,
+  clipboard: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M9 5.5h6M9 3.5h6A2.5 2.5 0 0 1 17.5 6v1A2.5 2.5 0 0 1 15 9.5H9A2.5 2.5 0 0 1 6.5 7V6A2.5 2.5 0 0 1 9 3.5Z" />
+      <path d="M8 6.5H6A2.5 2.5 0 0 0 3.5 9v8A2.5 2.5 0 0 0 6 19.5h12A2.5 2.5 0 0 0 20.5 17V9A2.5 2.5 0 0 0 18 6.5h-2" />
+    </svg>
+  `,
+  calendar: `
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M8 3v3M16 3v3M4.5 8.5h15" />
+      <path d="M6 5.5h12A2.5 2.5 0 0 1 20.5 8v10A2.5 2.5 0 0 1 18 20.5H6A2.5 2.5 0 0 1 3.5 18V8A2.5 2.5 0 0 1 6 5.5Z" />
+    </svg>
+  `,
+};
+
+function setButtonContent(id, icon, label) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.innerHTML = `<span class="btn-icon" aria-hidden="true">${icon}</span><span class="btn-label">${label}</span>`;
+}
+
+function shellQuote(value) {
+  return `'${String(value).replace(/'/g, `'\\''`)}'`;
+}
+
+function formatStamp(ts) {
+  const date = new Date(ts);
+  const y = String(date.getUTCFullYear()).padStart(4, "0");
+  const m = String(date.getUTCMonth() + 1).padStart(2, "0");
+  const d = String(date.getUTCDate()).padStart(2, "0");
+  const hh = String(date.getUTCHours()).padStart(2, "0");
+  const mm = String(date.getUTCMinutes()).padStart(2, "0");
+  const ss = String(date.getUTCSeconds()).padStart(2, "0");
+  return `${y}-${m}-${d} ${hh}:${mm}:${ss} +0000`;
+}
 
 function utcDate(year, monthIndex, day) {
   return new Date(Date.UTC(year, monthIndex, day));
@@ -44,14 +107,6 @@ function allDatesForYearGrid(year) {
 
 function emptyLevels() {
   return Array.from({ length: HEIGHT }, () => Array(WIDTH).fill(0));
-}
-
-function encodeShape(levels) {
-  const rows = [];
-  for (let y = 0; y < HEIGHT; y += 1) {
-    rows.push(levels[y].map((v) => Math.max(0, Math.min(MAX_LEVEL, Number(v) || 0))).join(""));
-  }
-  return btoa(rows.join("\n")).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/g, "");
 }
 
 function sanitizeShape(levels) {
@@ -83,10 +138,53 @@ function computeCommitScheduleFromLevels(levels, year) {
   return selected;
 }
 
+function buildGitCommand() {
+  const lines = [
+    "# Run this from the root of the git repository you want to update.",
+    "set -e",
+  ];
+
+  for (const year of state.years) {
+    const levels = yearShape(year);
+    const perDay = new Map();
+    const schedule = computeCommitScheduleFromLevels(levels, year);
+
+    for (const ts of schedule) {
+      const stamp = formatStamp(ts);
+      const day = stamp.slice(0, 10);
+      const count = (perDay.get(day) || 0) + 1;
+      perDay.set(day, count);
+      const msg = `[imprint] ${year} ${day} #${count}`;
+      lines.push(
+        `GIT_AUTHOR_DATE=${shellQuote(stamp)} GIT_COMMITTER_DATE=${shellQuote(stamp)} git commit --allow-empty -m ${shellQuote(msg)} --quiet`
+      );
+    }
+  }
+
+  if (lines.length === 2) {
+    return "# Draw some cells first, then copy the git command.";
+  }
+
+  return lines.join("\n");
+}
+
 function defaultYears() {
   const now = new Date();
   const current = now.getUTCFullYear();
   return [current - 2, current - 1, current];
+}
+
+function clampYear(value) {
+  const year = Number(value);
+  if (!Number.isFinite(year)) return null;
+  return Math.max(MIN_YEAR, Math.min(MAX_YEAR, Math.trunc(year)));
+}
+
+function clampYearInput(input) {
+  const year = clampYear(input.value);
+  if (year === null) return null;
+  input.value = String(year);
+  return year;
 }
 
 function loadState() {
@@ -104,17 +202,20 @@ function loadState() {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaults;
     const parsed = JSON.parse(raw);
-    const years = Array.isArray(parsed.years) && parsed.years.length ? parsed.years.map((y) => Number(y)).filter(Number.isFinite) : defaults.years;
+    const years = Array.isArray(parsed.years) && parsed.years.length
+      ? parsed.years.map(clampYear).filter((year) => year !== null)
+      : defaults.years;
     const shapes = {};
     for (const year of years) {
       shapes[year] = sanitizeShape(parsed.shapes?.[year] || emptyLevels());
     }
+    const currentYear = clampYear(parsed.currentYear) || defaults.currentYear;
     return {
       years: Array.from(new Set(years)).sort((a, b) => a - b),
-      currentYear: Number(parsed.currentYear) || defaults.currentYear,
+      currentYear,
       brushLevel: Number.isFinite(Number(parsed.brushLevel)) ? Number(parsed.brushLevel) : defaults.brushLevel,
-      rangeStart: Number(parsed.rangeStart) || defaults.rangeStart,
-      rangeEnd: Number(parsed.rangeEnd) || defaults.rangeEnd,
+      rangeStart: clampYear(parsed.rangeStart) || defaults.rangeStart,
+      rangeEnd: clampYear(parsed.rangeEnd) || defaults.rangeEnd,
       shapes,
     };
   } catch {
@@ -132,6 +233,8 @@ if (!state.shapes[state.currentYear]) {
 for (const year of state.years) {
   state.shapes[year] = sanitizeShape(state.shapes[year] || emptyLevels());
 }
+
+let isYearMenuOpen = false;
 
 const ctx = els.canvas.getContext("2d");
 const dpr = window.devicePixelRatio || 1;
@@ -168,9 +271,11 @@ function yearShape(year) {
 }
 
 function ensureYear(year, select = true, quiet = false) {
-  if (!Number.isFinite(year) || year < 1970 || year > 9999) {
+  const clampedYear = clampYear(year);
+  if (clampedYear === null) {
     return false;
   }
+  year = clampedYear;
   if (!state.years.includes(year)) {
     state.years.push(year);
     state.years.sort((a, b) => a - b);
@@ -205,14 +310,31 @@ function syncYearControls() {
   els.rangeStart.value = String(state.rangeStart);
   els.rangeEnd.value = String(state.rangeEnd);
 
-  els.currentYear.innerHTML = "";
+  const denseYearMode = state.years.length > YEAR_DENSITY_THRESHOLD;
+  els.yearSelect.classList.toggle("dense", denseYearMode);
+  els.yearList.classList.toggle("compact", denseYearMode);
+  els.toolbar?.classList.toggle("dense-years", denseYearMode);
+
+  els.currentYearLabel.textContent = String(state.currentYear);
+  els.currentYearTrigger.setAttribute("aria-expanded", String(isYearMenuOpen));
+  els.currentYearMenu.toggleAttribute("hidden", !isYearMenuOpen);
+  els.currentYearMenu.innerHTML = "";
   for (const year of state.years) {
-    const option = document.createElement("option");
-    option.value = String(year);
+    const option = document.createElement("button");
+    option.type = "button";
+    option.className = `year-select-option${year === state.currentYear ? " active" : ""}`;
+    option.setAttribute("role", "option");
+    option.setAttribute("aria-selected", String(year === state.currentYear));
     option.textContent = String(year);
-    els.currentYear.appendChild(option);
+    option.addEventListener("click", () => {
+      state.currentYear = year;
+      closeYearMenu(true);
+      syncYearControls();
+      render();
+      saveState();
+    });
+    els.currentYearMenu.appendChild(option);
   }
-  els.currentYear.value = String(state.currentYear);
 
   els.yearList.innerHTML = "";
   for (const year of state.years) {
@@ -233,7 +355,7 @@ function syncYearControls() {
     const remove = document.createElement("button");
     remove.type = "button";
     remove.className = "year-remove";
-    remove.textContent = "Remove";
+    remove.innerHTML = `<span class="btn-icon" aria-hidden="true">${ICONS.trash}</span><span class="btn-label">Remove</span>`;
     remove.disabled = state.years.length === 1;
     remove.addEventListener("click", () => removeYear(year));
 
@@ -258,24 +380,42 @@ function syncYearControls() {
   }
 }
 
+function openYearMenu() {
+  isYearMenuOpen = true;
+  syncYearControls();
+}
+
+function closeYearMenu(focusTrigger = false) {
+  if (!isYearMenuOpen) return;
+  isYearMenuOpen = false;
+  syncYearControls();
+  if (focusTrigger) {
+    els.currentYearTrigger.focus();
+  }
+}
+
+function toggleYearMenu() {
+  if (isYearMenuOpen) {
+    closeYearMenu();
+  } else {
+    openYearMenu();
+  }
+}
+
 function refreshSummaryAndCommand() {
   const lines = [];
   let total = 0;
-  const parts = [];
 
   for (const year of state.years) {
     const levels = yearShape(year);
     const count = computeCommitScheduleFromLevels(levels, year).length;
     total += count;
     lines.push(`${year}: ${count} commits`);
-    if (levels.some((row) => row.some((value) => value > 0))) {
-      parts.push(`--shape ${year}:${encodeShape(levels)}`);
-    }
   }
 
   lines.push(`Total: ${total} commits`);
   els.summary.textContent = lines.join("\n");
-  els.command.value = parts.length ? `python3 main.py \\\n  ${parts.join(" \\\n  ")}` : "Draw cells to generate a command.";
+  els.command.value = buildGitCommand();
 }
 
 function drawGrid() {
@@ -284,15 +424,15 @@ function drawGrid() {
   const levels = yearShape(year);
 
   ctx.clearRect(0, 0, canvasWidth, canvasHeight);
-  ctx.fillStyle = "#ffffff";
+  ctx.fillStyle = "#f6f8fa";
   ctx.fillRect(0, 0, canvasWidth, canvasHeight);
 
-  ctx.fillStyle = "#24292f";
-  ctx.font = "bold 13px Inter, ui-sans-serif, system-ui, sans-serif";
+  ctx.fillStyle = "#1f2937";
+  ctx.font = "bold 13px Inter Tight, Inter, ui-sans-serif, system-ui, sans-serif";
   ctx.fillText(String(year), 8, 18);
 
-  ctx.fillStyle = "#57606a";
-  ctx.font = "12px Inter, ui-sans-serif, system-ui, sans-serif";
+  ctx.fillStyle = "#6b7280";
+  ctx.font = "12px Inter Tight, Inter, ui-sans-serif, system-ui, sans-serif";
   for (let y = 0; y < HEIGHT; y += 1) {
     ctx.fillText(weekdayLabels[y][0], 4, marginY + y * (cell + gap) + 10);
   }
@@ -302,9 +442,9 @@ function drawGrid() {
       const left = marginX + x * (cell + gap);
       const top = marginY + y * (cell + gap);
       const outside = cal[x][y].getUTCFullYear() !== year;
-      const fill = outside ? "#f6f8fa" : colors[levels[y][x]];
+      const fill = outside ? "#edf2f7" : cellColors[levels[y][x]];
       ctx.fillStyle = fill;
-      ctx.strokeStyle = outside ? "#eaeef2" : "#d0d7de";
+      ctx.strokeStyle = outside ? "#dde5ee" : "#cdd6df";
       ctx.lineWidth = 1;
       ctx.fillRect(left, top, cell, cell);
       ctx.strokeRect(left + 0.5, top + 0.5, cell - 1, cell - 1);
@@ -351,14 +491,33 @@ els.singleYear.value = String(state.currentYear + 1);
 els.rangeStart.value = String(state.rangeStart);
 els.rangeEnd.value = String(state.rangeEnd);
 
-els.currentYear.addEventListener("change", () => {
-  state.currentYear = Number(els.currentYear.value);
-  render();
-  saveState();
+for (const input of [els.singleYear, els.rangeStart, els.rangeEnd]) {
+  input.addEventListener("input", () => {
+    clampYearInput(input);
+  });
+}
+
+els.currentYearTrigger.addEventListener("click", toggleYearMenu);
+
+els.currentYearTrigger.addEventListener("keydown", (event) => {
+  if (event.key === "ArrowDown" || event.key === "Enter" || event.key === " ") {
+    event.preventDefault();
+    openYearMenu();
+  } else if (event.key === "Escape") {
+    event.preventDefault();
+    closeYearMenu();
+  }
+});
+
+els.currentYearMenu.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    event.preventDefault();
+    closeYearMenu(true);
+  }
 });
 
 els.addYear.addEventListener("click", () => {
-  const year = Number(els.singleYear.value);
+  const year = clampYearInput(els.singleYear);
   if (ensureYear(year)) {
     state.currentYear = year;
     render();
@@ -367,8 +526,8 @@ els.addYear.addEventListener("click", () => {
 });
 
 els.addRange.addEventListener("click", () => {
-  let start = Number(els.rangeStart.value);
-  let end = Number(els.rangeEnd.value);
+  let start = clampYearInput(els.rangeStart);
+  let end = clampYearInput(els.rangeEnd);
   if (!Number.isFinite(start) || !Number.isFinite(end)) return;
   if (start > end) [start, end] = [end, start];
   state.rangeStart = start;
@@ -420,6 +579,26 @@ els.copyCommand.addEventListener("click", async () => {
     els.command.focus();
     els.command.select();
     document.execCommand("copy");
+  }
+});
+
+setButtonContent("add-year", ICONS.plus, "Add");
+setButtonContent("add-range", ICONS.calendar, "Load range");
+setButtonContent("clear-all", ICONS.trash, "Clear all");
+setButtonContent("clear-year", ICONS.trash, "Clear year");
+setButtonContent("prev-year", ICONS.chevronLeft, "Prev");
+setButtonContent("next-year", ICONS.chevronRight, "Next");
+setButtonContent("copy-command", ICONS.clipboard, "Copy command");
+
+document.addEventListener("pointerdown", (event) => {
+  if (!isYearMenuOpen) return;
+  if (els.yearSelect.contains(event.target)) return;
+  closeYearMenu();
+});
+
+document.addEventListener("keydown", (event) => {
+  if (event.key === "Escape") {
+    closeYearMenu();
   }
 });
 
