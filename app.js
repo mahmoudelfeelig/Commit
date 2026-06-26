@@ -3,7 +3,7 @@ const HEIGHT = 7;
 const MAX_LEVEL = 4;
 const MIN_YEAR = 1970;
 const MAX_YEAR = 9999;
-const STORAGE_KEY = "imprint-state-v1";
+const STORAGE_KEY = "commit-state-v1";
 const YEAR_DENSITY_THRESHOLD = 6;
 
 const cellColors = ["#e5e7eb", "#9fd89d", "#55c56c", "#2ea043", "#1f7a3d"];
@@ -154,7 +154,7 @@ function buildGitCommand() {
       const day = stamp.slice(0, 10);
       const count = (perDay.get(day) || 0) + 1;
       perDay.set(day, count);
-      const msg = `[imprint] ${year} ${day} #${count}`;
+      const msg = `[commit] ${year} ${day} #${count}`;
       lines.push(
         `GIT_AUTHOR_DATE=${shellQuote(stamp)} GIT_COMMITTER_DATE=${shellQuote(stamp)} git commit --allow-empty -m ${shellQuote(msg)} --quiet`
       );

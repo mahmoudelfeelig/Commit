@@ -136,7 +136,7 @@ def build_git_command_from_shapes(shapes: dict, years: list) -> str:
             stamp = format_stamp(ts)
             day = ts.date().isoformat()
             per_day[day] = per_day.get(day, 0) + 1
-            msg = f"[imprint] {year} {day} #{per_day[day]}"
+            msg = f"[commit] {year} {day} #{per_day[day]}"
             lines.append(
                 f"GIT_AUTHOR_DATE={shell_quote(stamp)} GIT_COMMITTER_DATE={shell_quote(stamp)} "
                 f"git commit --allow-empty -m {shell_quote(msg)} --quiet"

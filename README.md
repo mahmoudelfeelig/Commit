@@ -1,8 +1,8 @@
-# Imprint
+# Commit
 
-Imprint is a browser-based GitHub contribution graph designer. Draw the exact shape you want, manage multiple years, and copy a git command when you're done.
+Commit is a browser-based GitHub contribution graph designer. Draw the exact shape you want, manage multiple years, and copy a git command when you're done.
 
-The site is static and is currently hosted on `imprint.elfeel.me`.
+The site is static and is currently hosted on `commit.elfeel.me`.
 
 ## Run locally
 
@@ -11,6 +11,10 @@ python3 -m http.server 8000
 ```
 
 Open `http://localhost:8000` in your browser.
+
+## Run on the website
+
+You can alternatively go on `https://commit.elfeel.me` and use the app directly in your browser.
 
 ## What it does
 
