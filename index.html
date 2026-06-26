@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Imprint</title>
+    <meta
+      name="description"
+      content="Draw GitHub contribution graph shapes in the browser and copy the commit command."
+    />
+    <link rel="stylesheet" href="./styles.css" />
+    <script defer src="./app.js"></script>
+  </head>
+  <body>
+    <div class="shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Imprint</p>
+          <h1>Draw the graph you want, then copy the command.</h1>
+          <p class="lede">
+            Paint contribution cells in the browser, manage multiple years, and
+            export a command that turns your design into commits.
+          </p>
+        </div>
+        <div class="status">
+          <span class="status-label">Local only</span>
+          <span class="status-copy">Design stays in your browser until you copy the command.</span>
+        </div>
+      </header>
+
+      <div class="layout">
+        <aside class="sidebar">
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Years</h2>
+              <button id="clear-all" class="ghost-button" type="button">Clear all</button>
+            </div>
+            <div id="year-list" class="year-list" aria-label="Year list"></div>
+          </section>
+
+          <section class="panel">
+            <h2>Add years</h2>
+            <div class="form-grid">
+              <label class="field">
+                <span>Single year</span>
+                <input id="single-year" type="number" min="1970" max="9999" />
+              </label>
+              <button id="add-year" class="primary-button" type="button">Add</button>
+
+              <label class="field">
+                <span>Range start</span>
+                <input id="range-start" type="number" min="1970" max="9999" />
+              </label>
+              <label class="field">
+                <span>Range end</span>
+                <input id="range-end" type="number" min="1970" max="9999" />
+              </label>
+              <button id="add-range" class="primary-button full" type="button">Load range</button>
+            </div>
+          </section>
+        </aside>
+
+        <main class="workspace">
+          <section class="panel toolbar">
+            <div class="toolbar-group">
+              <button id="prev-year" class="ghost-button" type="button">Prev</button>
+              <button id="next-year" class="ghost-button" type="button">Next</button>
+            </div>
+
+            <label class="field compact">
+              <span>Selected year</span>
+              <select id="current-year"></select>
+            </label>
+
+            <div class="brushes" aria-label="Brush levels">
+              <span class="brush-label">Brush</span>
+              <div id="brush-group" class="brush-group"></div>
+            </div>
+
+            <button id="clear-year" class="ghost-button" type="button">Clear year</button>
+          </section>
+
+          <section class="panel canvas-panel">
+            <div class="canvas-wrap">
+              <canvas id="graph-canvas" aria-label="Contribution graph editor"></canvas>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-head">
+              <h2>Summary</h2>
+              <button id="copy-command" class="primary-button" type="button">Copy command</button>
+            </div>
+            <pre id="summary" class="summary"></pre>
+          </section>
+
+          <section class="panel">
+            <h2>Command</h2>
+            <textarea id="command" class="command" readonly spellcheck="false"></textarea>
+          </section>
+        </main>
+      </div>
+    </div>
+  </body>
+</html>

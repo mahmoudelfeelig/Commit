@@ -1,0 +1,365 @@
+:root {
+  color-scheme: light;
+  --bg: #f6f3ed;
+  --panel: #fffdf8;
+  --panel-strong: #ffffff;
+  --border: #d8d1c5;
+  --text: #1d232b;
+  --muted: #5c6672;
+  --accent: #0f7a5a;
+  --accent-strong: #095943;
+  --accent-soft: #dff2ea;
+  --shadow: 0 1px 2px rgba(18, 23, 28, 0.06), 0 10px 28px rgba(18, 23, 28, 0.06);
+  --radius: 10px;
+  --cell: 14px;
+  --gap: 3px;
+  --margin-x: 32px;
+  --margin-y: 22px;
+  --cell-outline: #d0d7de;
+  --outside-fill: #f6f8fa;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  min-height: 100%;
+}
+
+body {
+  font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text);
+  background:
+    linear-gradient(rgba(255, 255, 255, 0.58), rgba(255, 255, 255, 0.58)),
+    radial-gradient(circle at top left, rgba(15, 122, 90, 0.08), transparent 40%),
+    radial-gradient(circle at top right, rgba(90, 122, 15, 0.06), transparent 35%),
+    var(--bg);
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.shell {
+  width: min(1440px, calc(100vw - 32px));
+  margin: 0 auto;
+  padding: 24px 0 32px;
+}
+
+.topbar {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 24px;
+  margin-bottom: 18px;
+}
+
+.eyebrow {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+h1 {
+  font-size: clamp(28px, 4vw, 44px);
+  line-height: 1.05;
+  max-width: 15ch;
+}
+
+.lede {
+  margin-top: 10px;
+  max-width: 68ch;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
+.status {
+  display: grid;
+  gap: 8px;
+  justify-items: end;
+  text-align: right;
+  color: var(--muted);
+}
+
+.status-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--accent);
+}
+
+.layout {
+  display: grid;
+  grid-template-columns: 280px minmax(0, 1fr);
+  gap: 16px;
+}
+
+.sidebar,
+.workspace {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+}
+
+.panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 16px;
+}
+
+.panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+h2 {
+  font-size: 14px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.year-list {
+  display: grid;
+  gap: 6px;
+  max-height: 58vh;
+  overflow: auto;
+  padding-right: 4px;
+}
+
+.year-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.year-button {
+  width: 100%;
+  text-align: left;
+  border: 1px solid var(--border);
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.year-button.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent-strong);
+  font-weight: 700;
+}
+
+.year-remove {
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--muted);
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.year-remove:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 12px;
+}
+
+.toolbar-group,
+.brush-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.brushes {
+  display: grid;
+  gap: 8px;
+}
+
+.brush-label {
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+
+.brush-button {
+  min-width: 40px;
+  padding: 9px 12px;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel-strong);
+  color: var(--text);
+  cursor: pointer;
+}
+
+.brush-button.active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: white;
+}
+
+.ghost-button,
+.primary-button {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  cursor: pointer;
+}
+
+.ghost-button {
+  background: var(--panel-strong);
+  color: var(--text);
+}
+
+.primary-button {
+  background: var(--accent);
+  color: white;
+  border-color: var(--accent);
+}
+
+.ghost-button:hover,
+.primary-button:hover,
+.year-button:hover,
+.brush-button:hover {
+  filter: brightness(0.98);
+}
+
+.field {
+  display: grid;
+  gap: 6px;
+}
+
+.field > span {
+  font-size: 12px;
+  color: var(--muted);
+}
+
+.field.compact {
+  min-width: 180px;
+}
+
+input,
+select,
+textarea {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel-strong);
+  color: var(--text);
+  padding: 10px 12px;
+}
+
+textarea {
+  width: 100%;
+  min-height: 124px;
+  resize: vertical;
+  font-family: SFMono-Regular, ui-monospace, Consolas, "Liberation Mono", monospace;
+  line-height: 1.5;
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
+}
+
+.form-grid .full {
+  grid-column: 1 / -1;
+}
+
+.canvas-panel {
+  overflow: hidden;
+}
+
+.canvas-wrap {
+  overflow: auto;
+  padding-bottom: 2px;
+}
+
+canvas {
+  display: block;
+  image-rendering: pixelated;
+  background: white;
+}
+
+.summary {
+  margin: 0;
+  white-space: pre-wrap;
+  color: var(--text);
+  line-height: 1.5;
+  font-family: SFMono-Regular, ui-monospace, Consolas, "Liberation Mono", monospace;
+}
+
+@media (max-width: 1080px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .status {
+    justify-items: start;
+    text-align: left;
+  }
+}
+
+@media (max-width: 720px) {
+  .shell {
+    width: min(100vw - 20px, 100vw);
+    padding-top: 12px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: start;
+  }
+
+  h1 {
+    max-width: none;
+  }
+
+  .toolbar {
+    align-items: start;
+  }
+
+  .field.compact {
+    min-width: 100%;
+  }
+
+  .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
